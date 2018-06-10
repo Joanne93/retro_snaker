@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>贪吃蛇游戏</title>
+	<!-- <link rel="stylesheet" href="css/snake.css"> -->
+	<style type="text/css">
+	</style>
+</head>
+<body>
+	<div class="operation">
+		<a href="#" title="暂停" id="paused"><img src="images/snake/button_pause.png" alt=""></a>
+		<a href="#" title="继续" id="continue"><img src="images/snake/button_resume.png" alt=""></a>
+		<a href="#" title="重新开始" id="restart"><img src="images/snake/button_restart.png" alt=""></a>
+		<a href="#" title="退出" id="exit"><img src="images/snake/exit.png" alt=""></a>
+	</div>
+
+
+	<!-- <script type="text/javascript" src="js/game.js"></script>
+	<script type="text/javascript" src="js/map.js"></script>
+	<script type="text/javascript" src="js/snake.js"></script>
+	<script type="text/javascript" src="js/food.js"></script>
+	<script type="text/javascript" src="js/block.js"></script> -->
+
+	<script type="text/javascript" src = "js/sea.js"></script>
+	<script type="text/javascript" src = "js/seajs-css.js"></script>
+	<!-- 引入外部的css -->
+	<!-- <script type="text/javascript" src = "js/seajs-preload.js"></script> -->
+	<!-- 引入外部的js，eg:jq -->
+	<script type="text/javascript">
+	
+	/*
+		思路：
+		1、创建5个类：游戏类，地图类，蛇类，食物类，障碍类
+		2、初始化游戏类，在此之前需要初始化其他类
+		3、分别渲染地图，食物，障碍，蛇
+		4、给蛇添加移动的方法，然后游戏类调用并重新渲染蛇，发现需要清屏，再给map添加一个清屏的方法
+		5、游戏类获取用户输入方向键，并把这个值传递给蛇，蛇自动判断要不要转向，需要转向就修改自己的方向属性。速度过快会有问题省略了转向，  加个节流
+		6、判断蛇移动过程中是不是撞墙了，在游戏类添加这个检测的方法。判断之后，发现撞墙的时候还是会出去一节，原因是start方法中先move再渲染蛇，渲染蛇就是显示蛇的下一步操作，所以当撞墙了就不能再执行渲染蛇了
+		7、判断蛇是不是吃到食物了。把蛇头和食物进行对比。如果吃掉了，调用蛇变长的方法，和重置食物位置的方法。重置食物需要随机获取食物坐标。是循环蛇和障碍的数组，每一项的坐标和食物对比，由于不知道要循环多少次，可能下一次还会重合。用递归。
+		8、最后就是换蛇的图片了，不像障碍物和食物，图片就一张，直接渲染的时候就加上，但是蛇有蛇头，蛇身，蛇尾。而且蛇头和蛇尾分别对应四个方向的四张图片。传入一个图片对象，里面有三个数组，分别是蛇头蛇身和蛇尾
+		9、蛇头的图片是在蛇转向的时候根据下一个方向更换的，而蛇尾的图片是在转向移动完毕之后根据蛇屁股更换的。
+		10、游戏增强：食物图片随机。每吃完一个食物移动速度渐渐变快。吃到大便身体减一，吃到冰淇淋身体加2，吃到水果身体加1
+		11、增加游戏开始，暂停，结束按钮以及得分。
+		12:、蛇可以从一边墙出另一边墙进   未实现
+		13、seajs模块化
+
+	*/
+
+	function $(id) {return document.getElementById(id)};
+	seajs.config({
+		// 现在是在sea.js的目录里找其他的js
+		// base: "js",
+	})
+	seajs.use(["game","snake","food","block","map","snake.css"], function(Game, Snake, Food, Block, Map) {
+		// map实例
+		var map = new Map(20,20,600,600);
+		
+		// snake实例
+		var img_obj = {
+			head_img: ["images/snake/11.png", "images/snake/22.png", "images/snake/33.png", "images/snake/44.png"],
+			body_img: ["images/snake/55.png"],
+			tail_img: ["images/snake/66.png", "images/snake/77.png", "images/snake/88.png", "images/snake/99.png"],
+
+		}
+		var snake = new Snake(img_obj);
+
+		// food实例
+		// var f_img = "images/snake/food.jpg";
+		var f_img = [
+				"images/fruits/0.png", 
+				"images/fruits/1.png", 
+				"images/fruits/2.png", 
+				"images/fruits/3.png", 
+				"images/fruits/4.png", 
+				"images/fruits/5.png", 
+				"images/fruits/6.png",
+				"images/fruits/7.png",
+				"images/fruits/8.png",
+				"images/fruits/9.png",
+				"images/fruits/10.png",
+			]
+		var food = new Food(f_img);
+
+		// block实例
+		var b_img = "images/snake/block.png";
+		var block = new Block(b_img);
+
+		// game实例
+		var game = new Game(map,snake,food,block);
+		game.init();
+		
+
+		// 暂停
+        $("paused").onclick = function() {
+			if(game.flag) {
+				game.pause();
+			}
+			return false;
+        }
+        // 继续
+        $("continue").onclick = function() {
+            if(game.flag && game.lock) {
+                game.continue();
+            }
+			return false;
+        }
+        // 重新开始
+        $("restart").onclick = function() {
+            if(game.lock) {
+                game.restart();
+            }
+			return false;
+        }
+        // 退出
+        $("exit").onclick = function() {
+            if(confirm("你确定退出么？")) {
+                if (navigator.userAgent.indexOf("MSIE") > 0) {
+                    if (navigator.userAgent.indexOf("MSIE 6.0") > 0) {
+                        window.opener = null;
+                        window.close();  
+                    } else {
+                        window.open('', '_top');
+                        window.top.close();
+                    }
+                } else if (navigator.userAgent.indexOf("Firefox") > 0 || navigator.userAgent.indexOf("Chrome") > 0) {
+                    window.location.href = 'about:blank ';
+                }  else {
+                    window.opener = null;
+                    window.open('', '_self', ''); 
+                    window.close();
+                }
+            }
+        }
+	})	
+
+
+
+	/* 
+		问题：
+			1、在做吃到食物类型的时候，如果是冰淇淋，应该增加2，结果是增加了，但是尾巴渲染总是慢一步，在渲染蛇的身体的时候。从数组最后一节开始循环就没这个问题
+
+	*/
+	</script>
+</body>
+</html>
